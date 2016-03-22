@@ -23,10 +23,10 @@
 #include "VectorTranspose.h"
 #include "DiffusionDiscretization.h"
 #include "TimeDerivativeStructureDiscretization.h"
-#include "Underrelaxer.h"
 #include "StructureSourceDiscretization.h"
 #include "StructurePlasticDiscretization.h"
 #include "SourceDiscretization.h"
+#include "Underrelaxer.h"
 #include "AMG.h"
 #include "Linearizer.h"
 #include "GradientModel.h"
@@ -71,7 +71,6 @@ public:
     _faces(faces),
     _cells(mesh.getCells()),
     _faceCells(mesh.getFaceCells(_faces)),
-    _xc(dynamic_cast<const VectorT3Array&>(geomFields.coordinate[_cells])),
     _varField(varField),
     _xIndex(&_varField,&_cells),
     _dRdX(dynamic_cast<CCMatrix&>(matrix.getMatrix(_xIndex,_xIndex))),
@@ -246,147 +245,13 @@ public:
 
     }
   }
-  
-  void applySymmetryModifiedBC( const FloatValEvaluator<X>& bValue ) const
-  {
-          
-    for(int f=0; f<this->_faces.getCount(); f++)
-    {
-        const int c0 = this->_faceCells(f,0);
-        const int c1 = this->_faceCells(f,1);
 
-        for (int i=0; i<3; i++){
-            if (bValue[f][i]!=0.0){
-            //cout << "bValue " <<  bValue[f][i] <<  endl;
-            this->_x[c1][i]=bValue[f][i];
-            //this->_x[c0][i]=bValue[f][i];
-            }
-        }
 
-/*    const int c1 = _faceCells(f,1);
-    const X fluxB = -_r[c1];
-    const X dXC1 = bValue - _x[c1];
-    _dRdX.eliminateDirichlet(c1,_r,dXC1, _explicitMode);
-    _x[c1] = bValue;
-    _r[c1] = NumTypeTraits<X>::getZero();
-    if (!_explicitMode)
-      _dRdX.setDirichlet(c1);
-    return fluxB;*/
-    
-        const VectorT3 en = this->_faceArea[f]/this->_faceAreaMag[f];
-        const T_Scalar xC0_dotn = dot(this->_x[c0]-bValue[f],en);
-        const X xB = this->_x[c0] - 2.*xC0_dotn * en;
-
-        Diag dxBdxC0(Diag::getZero());
-        dxBdxC0(0,0) =  1.0 - 2.*en[0]*en[0];
-        dxBdxC0(0,1) =  - 2.*en[0]*en[1];
-        dxBdxC0(0,2) =  - 2.*en[0]*en[2];
-
-        dxBdxC0(1,0) =  - 2.*en[1]*en[0];
-        dxBdxC0(1,1) =  1.0 - 2.*en[1]*en[1];
-        dxBdxC0(1,2) =  - 2.*en[1]*en[2];
-
-        dxBdxC0(2,0) =  - 2.*en[2]*en[0];
-        dxBdxC0(2,1) =  - 2.*en[2]*en[1];
-        dxBdxC0(2,2) =  1.0 - 2.*en[2]*en[2];
-        
-        
-        const X xc1mxB = xB-this->_x[c1];
-        
-        // boundary value equation
-        // set all neighbour coeffs to zero first and ap to  -1
-        this->_dRdX.setDirichlet(c1);
-
-        // dependance on c0
-        this->_assembler.getCoeff10(f) = dxBdxC0;
-        this->_r[c1] = xc1mxB;
-        
-        for (int i=0; i<3; i++){
-            if (bValue[f][i]!=0.0){
-            this->_r[c1][i]=0.0;
-            }
-        }
-        
-        //cout << "bValue " <<  bValue[f] << "x[c0] " << this->_x[c0] << "en "<< en <<  endl;
-        //cout << "xc1mxB " <<  xc1mxB << "x[c1] " << this->_x[c1] << endl;
-
-    }
-  }
-
-  void applySurfingXBC(const FloatValEvaluator<X>& surfingParameters, const FloatValEvaluator<X>& bValue ) const
-  {
-          
-    for(int f=0; f<this->_faces.getCount(); f++)
-    {
-        const int c0 = this->_faceCells(f,0);
-        const int c1 = this->_faceCells(f,1);
-        X surfingbValue;
-        //cout << "coord: " <<  _xc[c1][0] << " " <<  _xc[c1][1] << " " <<  _xc[c1][2] <<  endl;
-        //this->_x[c1] = bValue[f];
-        for (int i=0; i<3; i++){
-            surfingbValue[i] = bValue[f][i]/2.0*( 1-tanh((_xc[c1][0]-surfingParameters[f][1]*surfingParameters[f][2])/surfingParameters[f][0]) );
-            if (bValue[f][i]!=0.0){
-            //cout << "bValue " <<  bValue[f][i] <<  endl;
-            this->_x[c1][i]=bValue[f][i]/2.0*( 1-tanh((_xc[c1][0]-surfingParameters[f][1]*surfingParameters[f][2])/surfingParameters[f][0]) );
-            //this->_x[c0][i]=bValue[f][i];
-            }
-        }
-
-/*    const int c1 = _faceCells(f,1);
-    const X fluxB = -_r[c1];
-    const X dXC1 = bValue - _x[c1];
-    _dRdX.eliminateDirichlet(c1,_r,dXC1, _explicitMode);
-    _x[c1] = bValue;
-    _r[c1] = NumTypeTraits<X>::getZero();
-    if (!_explicitMode)
-      _dRdX.setDirichlet(c1);
-    return fluxB;*/
-    
-        const VectorT3 en = this->_faceArea[f]/this->_faceAreaMag[f];
-        const T_Scalar xC0_dotn = dot(this->_x[c0]-surfingbValue,en);
-        const X xB = this->_x[c0] - 2.*xC0_dotn * en;
-
-        Diag dxBdxC0(Diag::getZero());
-        dxBdxC0(0,0) =  1.0 - 2.*en[0]*en[0];
-        dxBdxC0(0,1) =  - 2.*en[0]*en[1];
-        dxBdxC0(0,2) =  - 2.*en[0]*en[2];
-
-        dxBdxC0(1,0) =  - 2.*en[1]*en[0];
-        dxBdxC0(1,1) =  1.0 - 2.*en[1]*en[1];
-        dxBdxC0(1,2) =  - 2.*en[1]*en[2];
-
-        dxBdxC0(2,0) =  - 2.*en[2]*en[0];
-        dxBdxC0(2,1) =  - 2.*en[2]*en[1];
-        dxBdxC0(2,2) =  1.0 - 2.*en[2]*en[2];
-        
-        
-        const X xc1mxB = xB-this->_x[c1];
-        
-        // boundary value equation
-        // set all neighbour coeffs to zero first and ap to  -1
-        this->_dRdX.setDirichlet(c1);
-
-        // dependance on c0
-        this->_assembler.getCoeff10(f) = dxBdxC0;
-        this->_r[c1] = xc1mxB;
-        
-        for (int i=0; i<3; i++){
-            if (bValue[f][i]!=0.0){
-            this->_r[c1][i]=0.0;
-            }
-        }
-        
-        //cout << "bValue " <<  bValue[f] << "x[c0] " << this->_x[c0] << "en "<< en <<  endl;
-        //cout << "xc1mxB " <<  xc1mxB << "x[c1] " << this->_x[c1] << endl;
-
-    }
-  }
   
 protected:
   const StorageSite& _faces;
   const StorageSite& _cells;
   const CRConnectivity& _faceCells;
-  const VectorT3Array& _xc;
   const Field& _varField;
   const MultiField::ArrayIndex _xIndex;
   CCMatrix& _dRdX;
@@ -499,38 +364,6 @@ public:
 
         _structureFields.deformation.addArray(cells,sCell);
 
-        shared_ptr<VectorT3Array> eigenvalueCell(new VectorT3Array(cells.getCountLevel1()));
-        VectorT3 initialEigenvalue;
-        initialEigenvalue[0] = _options["initialEigenvalue1"];
-        initialEigenvalue[1] = _options["initialEigenvalue2"];
-        initialEigenvalue[2] = _options["initialEigenvalue3"];
-        *eigenvalueCell = initialEigenvalue;
-        _structureFields.eigenvalue.addArray(cells,eigenvalueCell);
-
-        shared_ptr<VectorT3Array> eigenvector1Cell(new VectorT3Array(cells.getCountLevel1()));
-        VectorT3 initialEigenvector1;
-        initialEigenvector1[0] = _options["initialEigenvector1X"];
-        initialEigenvector1[1] = _options["initialEigenvector1Y"];
-        initialEigenvector1[2] = _options["initialEigenvector1Z"];
-        *eigenvector1Cell = initialEigenvector1;
-        _structureFields.eigenvector1.addArray(cells,eigenvector1Cell);
-        
-        shared_ptr<VectorT3Array> eigenvector2Cell(new VectorT3Array(cells.getCountLevel1()));
-        VectorT3 initialEigenvector2;
-        initialEigenvector2[0] = _options["initialEigenvector2X"];
-        initialEigenvector2[1] = _options["initialEigenvector2Y"];
-        initialEigenvector2[2] = _options["initialEigenvector2Z"];
-        *eigenvector2Cell = initialEigenvector2;
-        _structureFields.eigenvector2.addArray(cells,eigenvector2Cell);
-
-        shared_ptr<VectorT3Array> eigenvector3Cell(new VectorT3Array(cells.getCountLevel1()));
-        VectorT3 initialEigenvector3;
-        initialEigenvector3[0] = _options["initialEigenvector3X"];
-        initialEigenvector3[1] = _options["initialEigenvector3Y"];
-        initialEigenvector3[2] = _options["initialEigenvector3Z"];
-        *eigenvector3Cell = initialEigenvector3;
-        _structureFields.eigenvector3.addArray(cells,eigenvector3Cell);
-
         if (_options.transient)
         {
 	    _structureFields.volume0.addArray(cells,
@@ -576,37 +409,13 @@ public:
         *etaCell = vc["eta"];
         _structureFields.eta.addArray(cells,etaCell);
 
-        shared_ptr<TArray> etaoldCell(new TArray(cells.getCountLevel1()));
-        *etaoldCell = vc["etaold"];
-        _structureFields.etaold.addArray(cells,etaoldCell);
-
         shared_ptr<TArray> eta1Cell(new TArray(cells.getCountLevel1()));
         *eta1Cell = vc["eta1"];
         _structureFields.eta1.addArray(cells,eta1Cell);
-        
-        shared_ptr<TArray> eta1oldCell(new TArray(cells.getCountLevel1()));
-        *eta1oldCell = vc["eta1old"];
-        _structureFields.eta1old.addArray(cells,eta1oldCell);
 
         shared_ptr<TArray> alphaCell(new TArray(cells.getCountLevel1()));
         *alphaCell = vc["alpha"];
         _structureFields.alpha.addArray(cells,alphaCell);
-
-        shared_ptr<TArray> pfvCell(new TArray(cells.getCountLevel1()));
-        *pfvCell = vc["pfv"];
-        _structureFields.pfv.addArray(cells,pfvCell);
-        
-        shared_ptr<TArray> pfperfectCell(new TArray(cells.getCountLevel1()));
-        *pfperfectCell = vc["pfperfect"];
-        _structureFields.pfperfect.addArray(cells,pfperfectCell);
-
-        shared_ptr<TArray> structcoef1Cell(new TArray(cells.getCountLevel1()));
-        *structcoef1Cell = vc["structcoef1"];
-        _structureFields.structcoef1.addArray(cells,structcoef1Cell);
-        
-        shared_ptr<TArray> structcoef2Cell(new TArray(cells.getCountLevel1()));
-        *structcoef2Cell = vc["structcoef2"];
-        _structureFields.structcoef2.addArray(cells,structcoef2Cell);
 
         shared_ptr<TArray> tCell(new TArray(cells.getCountLevel1()));
         *tCell = _options["operatingTemperature"];
@@ -641,14 +450,8 @@ public:
 
     }
      _structureFields.eta.syncLocal();
-     _structureFields.etaold.syncLocal();
      _structureFields.eta1.syncLocal();
-     _structureFields.eta1old.syncLocal();
      _structureFields.alpha.syncLocal();
-     _structureFields.pfv.syncLocal();
-      _structureFields.pfperfect.syncLocal();
-      _structureFields.structcoef1.syncLocal();
-      _structureFields.structcoef1.syncLocal();
      _structureFields.density.syncLocal();
      
      
@@ -1047,31 +850,6 @@ public:
                 gbc.applySymmetryBC();
                 allNeumann = false;
 	    }
-            else if (bc.bcType == "SymmetryModified")
-            {
-	        FloatValEvaluator<VectorT3>
-		  bDeformation(bc.getVal("specifiedXDeformation"),
-			       bc.getVal("specifiedYDeformation"),
-			       bc.getVal("specifiedZDeformation"),
-			       faces);
-                gbc.applySymmetryModifiedBC(bDeformation);
-                allNeumann = false;
-	    }
-            else if (bc.bcType == "SurfingX")
-            {
-	        FloatValEvaluator<VectorT3>
-		  bDeformation(bc.getVal("specifiedXDeformation"),
-			       bc.getVal("specifiedYDeformation"),
-			       bc.getVal("specifiedZDeformation"),
-			       faces);
-			FloatValEvaluator<VectorT3>
-		  surfingParameters(bc.getVal("specifiedlSurfingLoadNormFactor"),
-		  				bc.getVal("specifiedlSurfingLoadNum"),
-		  				bc.getVal("specifiedlSurfingLoadSpeed"),
-		  				faces);
-                gbc.applySurfingXBC(surfingParameters, bDeformation);
-                allNeumann = false;
-	    }
             else if (bc.bcType == "Interface")
             {
                 gbc.applyInterfaceBC();
@@ -1190,18 +968,8 @@ public:
 	     (_meshes,_geomFields,
 	      _structureFields.deformation,
 	      _structureFields.eta,
-	      _structureFields.etaold,
 	      _structureFields.eta1,
-	      _structureFields.eta1old,
 	      _structureFields.alpha,
-	      _structureFields.pfv,
-	      _structureFields.pfperfect,
-	      _structureFields.eigenvalue,
-	      _structureFields.eigenvector1,
-	      _structureFields.eigenvector2,
-	      _structureFields.eigenvector3,
-	      _structureFields.structcoef1,
-	      _structureFields.structcoef2,
 	      _structureFields.deformationGradient,
 	      _structureFields.temperature,
 	      _options["operatingTemperature"],
@@ -1605,20 +1373,7 @@ public:
       const TArray& eta = dynamic_cast<const TArray&>(_structureFields.eta[cells]);
       const TArray& eta1 = dynamic_cast<const TArray&>(_structureFields.eta1[cells]);
       const TArray& alpha = dynamic_cast<const TArray&>(_structureFields.alpha[cells]);
-      
-      const TArray& etaold = dynamic_cast<const TArray&>(_structureFields.etaold[cells]);
-      const TArray& eta1old = dynamic_cast<const TArray&>(_structureFields.eta1old[cells]);      
-      
-      const TArray& pfv = dynamic_cast<const TArray&>(_structureFields.pfv[cells]);
-      const TArray& pfperfect = dynamic_cast<const TArray&>(_structureFields.pfperfect[cells]);
-      const VectorT3Array& eigenvalue = dynamic_cast<const VectorT3Array&>(_structureFields.eigenvalue[cells]);
-      const VectorT3Array& eigenvector1 = dynamic_cast<const VectorT3Array&>(_structureFields.eigenvector1[cells]);
-      const VectorT3Array& eigenvector2 = dynamic_cast<const VectorT3Array&>(_structureFields.eigenvector2[cells]);
-      const VectorT3Array& eigenvector3 = dynamic_cast<const VectorT3Array&>(_structureFields.eigenvector3[cells]);
-      
-      const TArray& structcoef1 = dynamic_cast<const TArray&>(_structureFields.structcoef1[cells]);
-      const TArray& structcoef2 = dynamic_cast<const TArray&>(_structureFields.structcoef2[cells]); 
-      
+
       const TArray& temperature = dynamic_cast<const TArray&>(_structureFields.temperature[cells]);
       
       const T two(2.0);
@@ -1630,82 +1385,25 @@ public:
 	  const VGradType& wg = wGrad[n];
 	  VGradType wgPlusTranspose = wGrad[n];
 	  const VGradType& pS =  plasticStrainCell[n];
-	  	  	    
 	  for(int i=0;i<3;i++)
 	    for(int j=0;j<3;j++)
 	      wgPlusTranspose[i][j] += wg[j][i];
 	  
-	  /*tractionX[n][0] = wgPlusTranspose[0][0]*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*eta1[n]
-	                    -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][0]*eigenvector1[n][0] + eigenvalue[n][1]*eigenvector2[n][0]*eigenvector2[n][0] + eigenvalue[n][2]*eigenvector3[n][0]*eigenvector3[n][0]);
-	  tractionX[n][1] = wgPlusTranspose[0][1]*eta[n]
-	                    -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][1]*eigenvector1[n][0] + eigenvalue[n][1]*eigenvector2[n][1]*eigenvector2[n][0] + eigenvalue[n][2]*eigenvector3[n][1]*eigenvector3[n][0]);
-	  tractionX[n][2] = wgPlusTranspose[0][2]*eta[n]
-	                    -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][2]*eigenvector1[n][0] + eigenvalue[n][1]*eigenvector2[n][2]*eigenvector2[n][0] + eigenvalue[n][2]*eigenvector3[n][2]*eigenvector3[n][0]);
-      tractionY[n][0] = wgPlusTranspose[1][0]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][0]*eigenvector1[n][1] + eigenvalue[n][1]*eigenvector2[n][0]*eigenvector2[n][1] + eigenvalue[n][2]*eigenvector3[n][0]*eigenvector3[n][1]);
-      tractionY[n][1] = wgPlusTranspose[1][1]*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*eta1[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][1]*eigenvector1[n][1] + eigenvalue[n][1]*eigenvector2[n][1]*eigenvector2[n][1] + eigenvalue[n][2]*eigenvector3[n][1]*eigenvector3[n][1]);
-      tractionY[n][2] = wgPlusTranspose[1][2]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][2]*eigenvector1[n][1] + eigenvalue[n][1]*eigenvector2[n][2]*eigenvector2[n][1] + eigenvalue[n][2]*eigenvector3[n][2]*eigenvector3[n][1]);
-      tractionZ[n][0] = wgPlusTranspose[2][0]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][0]*eigenvector1[n][2] + eigenvalue[n][1]*eigenvector2[n][0]*eigenvector2[n][2] + eigenvalue[n][2]*eigenvector3[n][0]*eigenvector3[n][2]);
-      tractionZ[n][1] = wgPlusTranspose[2][1]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][1]*eigenvector1[n][2] + eigenvalue[n][1]*eigenvector2[n][1]*eigenvector2[n][2] + eigenvalue[n][2]*eigenvector3[n][1]*eigenvector3[n][2]);
-      tractionZ[n][2] = wgPlusTranspose[2][2]*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*eta1[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvalue[n][0]*eigenvector1[n][2]*eigenvector1[n][2] + eigenvalue[n][1]*eigenvector2[n][2]*eigenvector2[n][2] + eigenvalue[n][2]*eigenvector3[n][2]*eigenvector3[n][2]);*/	  
+	  tractionX[n][0] = wgPlusTranspose[0][0]*eta[n]+
+	 	    (wg[0][0]+wg[1][1]+wg[2][2])*eta1[n];
+	  tractionX[n][1] = wgPlusTranspose[0][1]*eta[n];
+	  tractionX[n][2] = wgPlusTranspose[0][2]*eta[n];
 
-	  tractionX[n][0] = wgPlusTranspose[0][0]*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*eta1[n]
-	                    -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector1[n][0]-(wg[0][0]+wg[1][1]+wg[2][2])/3.0);
-	  tractionX[n][1] = wgPlusTranspose[0][1]*eta[n]
-	                    -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector1[n][1]);
-	  tractionX[n][2] = wgPlusTranspose[0][2]*eta[n]
-	                    -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector1[n][2]);
-      tractionY[n][0] = wgPlusTranspose[1][0]*eta[n]
-                        -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector2[n][0]);
-      tractionY[n][1] = wgPlusTranspose[1][1]*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*eta1[n]
-                        -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector2[n][1]-(wg[0][0]+wg[1][1]+wg[2][2])/3.0);
-      tractionY[n][2] = wgPlusTranspose[1][2]*eta[n]
-                        -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector2[n][2]);
-      tractionZ[n][0] = wgPlusTranspose[2][0]*eta[n]
-                        -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector3[n][0]);
-      tractionZ[n][1] = wgPlusTranspose[2][1]*eta[n]
-                        -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector3[n][1]);
-      tractionZ[n][2] = wgPlusTranspose[2][2]*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*eta1[n]
-                        -structcoef2[n]*2.0*etaold[n]*(1-pfv[n]*pfv[n])*(eigenvector3[n][2]-(wg[0][0]+wg[1][1]+wg[2][2])/3.0);
+          tractionY[n][0] = wgPlusTranspose[1][0]*eta[n];
+          tractionY[n][1] = wgPlusTranspose[1][1]*eta[n]+
+	    (wg[0][0]+wg[1][1]+wg[2][2])*eta1[n];
+          tractionY[n][2] = wgPlusTranspose[1][2]*eta[n];
 
-	  /*tractionX[n][0] = (wgPlusTranspose[0][0]-(wg[0][0]+wg[1][1]+wg[2][2])*2.0/3.0)*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*(eta1[n]+2.0/3.0*eta[n])
-	                    -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(wgPlusTranspose[0][0]/2.0-(wg[0][0]+wg[1][1]+wg[2][2])/3.0);
-	  tractionX[n][1] = wgPlusTranspose[0][1]*eta[n]
-	                    -2.0*etaold[n]*(1-pfv[n]*pfv[n])*wgPlusTranspose[0][1];
-	  tractionX[n][2] = wgPlusTranspose[0][2]*eta[n]
-	                    -2.0*etaold[n]*(1-pfv[n]*pfv[n])*wgPlusTranspose[0][2];
-      tractionY[n][0] = wgPlusTranspose[1][0]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*wgPlusTranspose[1][0];
-      tractionY[n][1] = (wgPlusTranspose[1][1]-(wg[0][0]+wg[1][1]+wg[2][2])*2.0/3.0)*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*(eta1[n]+2.0/3.0*eta[n])
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(wgPlusTranspose[1][1]/2.0-(wg[0][0]+wg[1][1]+wg[2][2])/3.0);
-      tractionY[n][2] = wgPlusTranspose[1][2]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*wgPlusTranspose[1][2];
-      tractionZ[n][0] = wgPlusTranspose[2][0]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*wgPlusTranspose[2][0];
-      tractionZ[n][1] = wgPlusTranspose[2][1]*eta[n]
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*wgPlusTranspose[2][1];
-      tractionZ[n][2] = (wgPlusTranspose[2][2]-(wg[0][0]+wg[1][1]+wg[2][2])*2.0/3.0)*eta[n]+(wg[0][0]+wg[1][1]+wg[2][2])*(eta1[n]+2.0/3.0*eta[n])
-                        -2.0*etaold[n]*(1-pfv[n]*pfv[n])*(wgPlusTranspose[2][2]/2.0-(wg[0][0]+wg[1][1]+wg[2][2])/3.0);	  */
+          tractionZ[n][0] = wgPlusTranspose[2][0]*eta[n];
+          tractionZ[n][1] = wgPlusTranspose[2][1]*eta[n];
+          tractionZ[n][2] = wgPlusTranspose[2][2]*eta[n]+
+	    (wg[0][0]+wg[1][1]+wg[2][2])*eta1[n];	  
 
-      
-      if ((wg[0][0]+wg[1][1]+wg[2][2])>0 && pfperfect[n]!=-1){
-          tractionX[n][0] -= structcoef1[n]*(1-pfv[n]*pfv[n])*(eta1old[n]+2.0/3.0*etaold[n])*(wg[0][0]+wg[1][1]+wg[2][2]);
-          tractionY[n][1] -= structcoef1[n]*(1-pfv[n]*pfv[n])*(eta1old[n]+2.0/3.0*etaold[n])*(wg[0][0]+wg[1][1]+wg[2][2]);
-          tractionZ[n][2] -= structcoef1[n]*(1-pfv[n]*pfv[n])*(eta1old[n]+2.0/3.0*etaold[n])*(wg[0][0]+wg[1][1]+wg[2][2]);
-      
-      }
-      if (pfperfect[n]==-1){
-          tractionX[n][0] -= structcoef1[n]*(1-pfv[n]*pfv[n])*(eta1old[n]+2.0/3.0*etaold[n])*(wg[0][0]+wg[1][1]+wg[2][2]);
-          tractionY[n][1] -= structcoef1[n]*(1-pfv[n]*pfv[n])*(eta1old[n]+2.0/3.0*etaold[n])*(wg[0][0]+wg[1][1]+wg[2][2]);
-          tractionZ[n][2] -= structcoef1[n]*(1-pfv[n]*pfv[n])*(eta1old[n]+2.0/3.0*etaold[n])*(wg[0][0]+wg[1][1]+wg[2][2]);
-
-      }      
-            
 	  if(_options.residualStress)
 	  {
 	      tractionX[n][0] += _options["residualXXStress"];
@@ -1728,8 +1426,8 @@ public:
 	      }
 	  }
 
-      if(_options.creep)
-      {
+          if(_options.creep)
+          {
               tractionX[n][0]-=(two*eta[n]*pS[0][0] + 
                                 (pS[0][0] + pS[1][1])*eta1[n]);
               tractionX[n][1]-=(two*eta[n]*pS[0][1]);
@@ -1741,9 +1439,10 @@ public:
               tractionY[n][2]-=(two*eta[n]*pS[1][2]);
 	  }
 
-      if (mesh.getDimension() == 2)
-      {tractionZ[n] = zero;}
-      
+          if (mesh.getDimension() == 2)
+          {
+              tractionZ[n] = zero;
+	  }
       }
   }
 
