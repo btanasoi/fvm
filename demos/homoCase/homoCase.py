@@ -23,6 +23,170 @@ from FluentCase import FluentCase
 import tecplotEntireStructureDomainPara
 import tecplotEntireFractureDomainPara
 
+def decomposeStrainTensor (strX,strY,strZ,evalue,evector1,evector2,evector3,i,pfp_flag,rank):
+    zeroThreshold1=1e-14
+    zeroThreshold2=1e-3
+    A=array([strX,strY,strZ])
+    #print linalg.det(A),strX,strY,strZ,A[1][1]
+    p1 = A[0][1]**2.0 + A[0][2]**2.0 + A[1][2]**2.0
+    if p1 == 0: 
+        # A is diagonal.
+        eig1 = A[0][0]
+        eig2 = A[1][1]
+        eig3 = A[2][2]
+        
+    q = (A[0][0]+A[1][1]+A[2][2])/3.0
+    p2 = (A[0][0] - q)**2.0 + (A[1][1] - q)**2.0 + (A[2][2] - q)**2.0 + 2 * p1
+    p = sqrt(p2 / 6.0)
+    I = identity(3)
+    B = (1 / p) * (A - q * I)       # I is the identity matrix
+    r = linalg.det(B) / 2
+    #In exact arithmetic for a symmetric matrix  -1 <= r <= 1
+    #but computation error can leave it slightly outside this range.
+    if r <= -1:
+        phi = pi / 3
+    elif r >= 1:
+        phi = 0
+    else:
+        phi = arccos(r) / 3
+   # the eigenvalues satisfy eig3 <= eig2 <= eig1
+    eig1 = q + 2 * p * cos(phi)
+    eig3 = q + 2 * p * cos(phi + (2*pi/3))
+    eig2 = 3 * q - eig1 - eig3     # since trace(A) = eig1 + eig2 + eig3
+
+
+    #print strX,strY,strZ,eig1,eig2,eig3
+    if fabs(eig1-eig2)<sqrt(zeroThreshold1):
+        C1=(A-eig2*I).dot(A-eig3*I)
+        C2=A-eig3*I
+        C3=(A-eig1*I).dot(A-eig2*I)
+    elif fabs(eig1-eig3)<sqrt(zeroThreshold1):
+        C1=(A-eig2*I).dot(A-eig3*I)
+        C2=(A-eig1*I).dot(A-eig3*I)
+        C3=A-eig2*I
+    elif fabs(eig2-eig3)<sqrt(zeroThreshold1):
+        C1=(A-eig2*I).dot(A-eig3*I)
+        C2=(A-eig1*I).dot(A-eig3*I)
+        C3=A-eig1*I
+    else:
+        C1=(A-eig2*I).dot(A-eig3*I)
+        C2=(A-eig1*I).dot(A-eig3*I)
+        C3=(A-eig1*I).dot(A-eig2*I)
+        
+    P1=array([C1[0][0],C1[1][0],C1[2][0]])
+    if linalg.norm(P1)>zeroThreshold1:
+        P1=P1/linalg.norm(P1)
+    else :
+        P1=array([C1[0][1],C1[1][1],C1[2][1]])
+        if linalg.norm(P1)>zeroThreshold1:
+            P1=P1/linalg.norm(P1)
+        else:
+            P1=array([C1[0][2],C1[1][2],C1[2][2]])
+            if linalg.norm(P1)>zeroThreshold1:
+                P1=P1/linalg.norm(P1)
+            else:
+                P1=array([1,0,0])
+                if linalg.norm((A-eig1*I).dot(P1))>zeroThreshold2 and rank==0:
+                    print "CANNOT NOT DETERMINE EIGENVECTOR P1!"
+                    print "Eigenvalue: ",eig1,eig2,eig3
+                    print "A: ",A
+                    print "C1: ",C1
+                    print "A-eig1*I: ",A-eig1*I
+                    print "P1: ",P1
+                    print linalg.norm((A-eig1*I).dot(P1))
+                    sys.exit()
+    P2_found_flag=0
+    P2=array([C2[0][0],C2[1][0],C2[2][0]])   
+    if linalg.norm(P2)>zeroThreshold1:
+        P2=P2/linalg.norm(P2)
+        if P1.dot(P2)<zeroThreshold2:
+            P2_found_flag=1
+    if P2_found_flag==0 :
+        P2=array([C2[0][1],C2[1][1],C2[2][1]])
+        if linalg.norm(P2)>zeroThreshold1:
+            P2=P2/linalg.norm(P2)
+            if P1.dot(P2)<zeroThreshold2:
+                P2_found_flag=1
+    if P2_found_flag==0 :
+        P2=array([C2[0][2],C2[1][2],C2[2][2]])
+        if linalg.norm(P2)>zeroThreshold1:
+            P2=P2/linalg.norm(P2)
+            if P1.dot(P2)<zeroThreshold2:
+                P2_found_flag=1
+            else:
+                P2=array([0,1,0])
+                if linalg.norm((A-eig1*I).dot(P1))>zeroThreshold2 and rank==0:
+                    print "CANNOT NOT DETERMINE EIGENVECTOR P2!"
+                    print "Eigenvalue: ",eig1,eig2,eig3
+                    print "A: ",A
+                    print "C1: ",C1
+                    print "C2: ",C2
+                    print "A-eig2*I: ",A-eig2*I
+                    print "P2: ",P2
+                    print linalg.norm((A-eig2*I).dot(P2))
+                    sys.exit()       
+    P3_found_flag=0
+    P3=array([C3[0][0],C3[1][0],C3[2][0]])   
+    if linalg.norm(P3)>zeroThreshold1:
+        P3=P3/linalg.norm(P3)
+        if P1.dot(P3)<zeroThreshold2 and P2.dot(P3)<zeroThreshold2:
+            P3_found_flag=1
+    if P3_found_flag==0 :
+        P3=array([C3[0][1],C3[1][1],C3[2][1]])
+        if linalg.norm(P3)>zeroThreshold1:
+            P3=P3/linalg.norm(P3)
+            if P1.dot(P3)<zeroThreshold2 and P2.dot(P3)<zeroThreshold2:
+                P3_found_flag=1
+    if P3_found_flag==0 :
+        P3=array([C3[0][2],C3[1][2],C3[2][2]])
+        if linalg.norm(P3)>zeroThreshold1:
+            P3=P3/linalg.norm(P3)
+            if P1.dot(P3)<zeroThreshold2 and P2.dot(P3)<zeroThreshold2:
+                P3_found_flag=1
+            elif rank==0:
+                print "CANNOT NOT DETERMINE EIGENVECTOR P3!"
+                print "Eigenvalue: ",eig1,eig2,eig3
+                print "A: ",A
+                print "C1: ",C1
+                print "C2: ",C2
+                print "C3: ",C3
+                print "A-eig3*I: ",A-eig3*I
+                print "P1,P2,P3: ",P1,P2,P3
+                sys.exit()   
+    if eig1<0:
+        evalue[0]=eig1
+    else:
+        evalue[0]=eig1
+    if eig2<0:
+        evalue[1]=eig2
+    else:
+        evalue[1]=eig2
+    if eig3<0:
+        evalue[2]=eig3
+    else:
+        evalue[2]=eig3
+    if pfp_flag==-1:
+        evalue[0]=eig1
+        evalue[1]=eig2
+        evalue[2]=eig3
+    evector1[0]=P1[0]
+    evector1[1]=P1[1]
+    evector1[2]=P1[2]
+    evector2[0]=P2[0]
+    evector2[1]=P2[1]
+    evector2[2]=P2[2]
+    evector3[0]=P3[0]
+    evector3[1]=P3[1]
+    evector3[2]=P3[2]
+    
+    if i==100:
+        print "Eigenvalue: ",eig1,eig2,eig3
+        print "A: ",A
+        print "C1: ",C1
+        print "C2: ",C2
+        print "C3: ",C3
+        print "P1,P2,P3: ",P1,P2,P3
+
 ##########################################################################################   
 # parameter set up
  ########################################################################################## 
@@ -58,14 +222,12 @@ cLoC=  1e-5                    # model parameter controlling the width of the sm
 Diff = 4.0*cLoC*cLoC           # fracture Conductivity Coefficient
 crackPF = 1e-3			       # Phase Field Value at Crack
 NumofFiber = 0
-alpha = 70e-6
 
 DeformUnit = (cFED*BoundaryPositionTop/Lamda)**0.5  #Normalized Displacement Unit
 #DispStep = 0.02*DeformUnit	   # Displacement Step
 DispStep = 1e-6
-StressStep = -1e6
+StressStep = 1e6
 LoadCoef = -0.5
-TempStep = 10
 
 OInterval_s = 1                 #Output interval for equilibrium status
 OInterval_l = 50
@@ -77,16 +239,17 @@ DispReFactor=1.0               #Smaller displacement step is: 1/DispReFactor of 
 MidIterUpLimit = 200
 
 StiffnessResidual = 1e-6       #Used to have a lower bound of the material constant for damaged cell
-StructTolerance = 1e-3         #Tolerance for structure model inner iteration
-StructOuterTolerance = 1e-3
+StructTolerance = 1e-4         #Tolerance for structure model inner iteration
+StructOuterTolerance = 1e-4
 StructIterFlag = 0             #1--Do structure model iteration; 0--No structure model iteration
+StructIterUpLimit = 80
 
 PFTolerance = 1e-5             #Tolerance for fracture model iteration
 PFOuterTolerance = 1e-5
 PFIterFlag = 1                 #1--Do convergence test iteration; 0--No convergence test iteration
 
-PerfectRad = 0
-SymFlag = 1 # 1--Symmetric 0--Asymmetric
+PerfectRad = 0e-3
+SymFlag = 0 # 1--Symmetric 0--Asymmetric
 trace_change_threshold = 1e-8
 
 structure_file_name = "tecplotresult_structure-pmma-fiber" + ".dat"
@@ -221,11 +384,11 @@ for id in [beamBack]:
 for id in [beamFront]:
     if id in StructurebcMap:
         bc = StructurebcMap[id]
-        #bc.bcType = 'Symmetry'
-        bc.bcType = 'SpecifiedTraction'
-        bc['specifiedXZTraction'] = 0
-        bc['specifiedYZTraction'] = 0
-        bc['specifiedZZTraction'] = 0
+        bc.bcType = 'Symmetry'
+        #bc.bcType = 'SpecifiedTraction'
+        #bc['specifiedXZTraction'] = 0
+        #bc['specifiedYZTraction'] = 0
+        #bc['specifiedZZTraction'] = 0
 
 
 vcMap = smodel.getVCMap()
@@ -233,7 +396,11 @@ for i,vc in vcMap.iteritems():
     vc['density'] = 8912
     vc['eta'] = E/(2.*(1+nu))
     vc['eta1'] = nu*E/((1+nu)*(1-2.0*nu))
-    vc['alpha'] = alpha
+    vc['etaold'] = E/(2.*(1+nu))
+    vc['eta1old'] = nu*E/((1+nu)*(1-2.0*nu))
+    vc['pfv'] = 1.0
+    vc['structcoef1'] = 0.8
+    vc['structcoef2'] = 0.5
 ##########################################################################################
 #End of the boundary conditions set up
 ##########################################################################################
@@ -288,8 +455,6 @@ smodel.init()
 #Set back to False
 soptions.transient = False
 soptions.creep = False
-soptions.thermo = True
-soptions.residualStress = True
 ##########################################################################################
 # Model Initialization
 ##########################################################################################
@@ -322,7 +487,6 @@ if NumofFiber!=0:
 
 EnergyHistoryField = []
 PFHistoryField = []
-PFPerfectField = []
 DeformationHistoryX = []
 DeformationHistoryY = []
 DeformationHistoryZ = []
@@ -375,12 +539,22 @@ for n in range(0,nmesh):
     volumeA=volume.asNumPyArray()
     etaFields = structureFields.eta[cellSitesLocal[n]]
     etaFieldsA = etaFields.asNumPyArray() 
+    etaoldFields = structureFields.etaold[cellSitesLocal[n]]
+    etaoldFieldsA = etaoldFields.asNumPyArray() 
     eta1Fields = structureFields.eta1[cellSitesLocal[n]]
     eta1FieldsA = eta1Fields.asNumPyArray()
-
-    temperatureFields = structureFields.temperature[cellSitesLocal[n]]
-    temperatureFieldsA = temperatureFields.asNumPyArray()
-
+    eta1oldFields = structureFields.eta1old[cellSitesLocal[n]]
+    eta1oldFieldsA = eta1oldFields.asNumPyArray()
+    pfperfectFields = structureFields.pfperfect[cellSitesLocal[n]]
+    pfperfectFieldsA = pfperfectFields.asNumPyArray()
+    pfvFields = structureFields.pfv[cellSitesLocal[n]]
+    pfvFieldsA = pfvFields.asNumPyArray()
+    structcoef1Fields = structureFields.structcoef1[cellSitesLocal[n]]
+    structcoef1FieldsA = structcoef1Fields.asNumPyArray() 
+    structcoef2Fields = structureFields.structcoef2[cellSitesLocal[n]]
+    structcoef2FieldsA = structcoef2Fields.asNumPyArray() 
+    PhaseField = fractureFields.phasefieldvalue[cellSitesLocal[n]]
+    PhaseFieldA = PhaseField.asNumPyArray()
     for i in range(0,Count):
 ################Pre-defined crack#####################
         PFHistoryField.append(1.0)
@@ -388,14 +562,15 @@ for n in range(0,nmesh):
         #(coordA[i,0]-0.1/2.0)<0.0 and\
         #(coordA[i,1]-0.04/2.0+1e-4)>0.0 and\
         #(coordA[i,1]-0.04/2.0-1e-4)<0.0:
-        #    PFHistoryField[i]=0   
+        #    PFHistoryField[i]=0 
+        #    pfperfectFieldsA[i]=-1  
+        #    pfvFieldsA[i]=0.0
 ################Forcing perfect region################  
-        PFPerfectField.append(0.0)
         if (coordA[i,1]-0.0)**2.0<PerfectRad**2.0 or\
         (coordA[i,1]-4e-2)**2.0<PerfectRad**2.0:
         #(coordA[i,0]-0.0)**2.0+(coordA[i,1]-9e-6)**2.0<PerfectRad**2.0 or\
         #(coordA[i,0]-9e-6)**2.0+(coordA[i,1]-9e-6)**2.0<PerfectRad**2.0:
-            PFPerfectField[i]=1
+            pfperfectFieldsA[i]=1
 
         PF_stored.append(0)
         PF_inner.append(0)
@@ -412,27 +587,15 @@ for n in range(0,nmesh):
         strain_trace.append(0)
         ElasticEnergyField.append(0)
         EnergyHistoryField.append(0)
-        
-        if PFHistoryField[i]==1.0:
-            E_local.append(E)
-            nu_local.append(nu)
-            K_local.append(\
-            #9.0*K*G/(3.0*K+4.0*G)
-            K
-            )
-            Lamda_local.append(E_local[i]*nu_local[i]/(1+nu_local[i])/(1-2.0*nu_local[i]) )
-            G_local.append(E_local[i]/(2.*(1+nu_local[i])))
-        else :
-            E_local.append(E*(PFHistoryField[i]**2.0+StiffnessResidual))
-            nu_local.append(nu)
-            K_local.append(\
-            #9.0*K*G/(3.0*K+4.0*G)
-            K*(PFHistoryField[i]**2.0+StiffnessResidual)
-            )
-            Lamda_local.append(E_local[i]*nu_local[i]/(1+nu_local[i])/(1-2.0*nu_local[i])*(PFHistoryField[i]**2.0+StiffnessResidual) )
-            G_local.append(E_local[i]/(2.*(1+nu_local[i]))*(PFHistoryField[i]**2.0+StiffnessResidual))
-            etaFieldsA[i]=G_local[i]
-            eta1FieldsA[i]=Lamda_local[i]
+
+        E_local.append(E)
+        nu_local.append(nu)
+        K_local.append(\
+        #9.0*K*G/(3.0*K+4.0*G)
+        K
+        )
+        Lamda_local.append(E_local[i]*nu_local[i]/(1+nu_local[i])/(1-2.0*nu_local[i]) )
+        G_local.append(E_local[i]/(2.*(1+nu_local[i])))
 
         for fiber_count in range(0,NumofFiber) :
             if((coordA[i,0]-fiber_x[fiber_count])**2+\
@@ -458,30 +621,23 @@ for nstep in range(0,numSteps):
    if rank_id==0:
        print "----------Starting step: ",nstep, "Displacement: ",Displacement
 
-   #for id in [beamTop]:
-   #    if id in StructurebcMap:
-   #        bc = StructurebcMap[id]
-   #        bc['specifiedYYTraction'] = LoadCoef*ExternalStress
+   for id in [beamTop]:
+       if id in StructurebcMap:
+           bc = StructurebcMap[id]
+           bc['specifiedYYTraction'] = LoadCoef*ExternalStress
            #bc['specifiedYDeformation'] = Displacement
    #for id in [beamFront]:
    #    if id in StructurebcMap:
    #        bc = StructurebcMap[id]
    #        bc['specifiedZZTraction'] = ExternalStress
-   #for id in [beamRight]:
-   #    if id in StructurebcMap:
-   #        bc = StructurebcMap[id]
-   #        bc['specifiedXXTraction'] = ExternalStress
+   for id in [beamRight]:
+       if id in StructurebcMap:
+           bc = StructurebcMap[id]
+           bc['specifiedXXTraction'] = ExternalStress
    #for id in [beamBot]:
    #    if id in StructurebcMap:
    #        bc = StructurebcMap[id]
    #        bc['specifiedYYTraction'] =ExternalStress
-   
-   for i in range(0,Count):
-       #if i == 0:
-       #    print "Previous Temperature", temperatureFieldsA[i]
-       temperatureFieldsA[i] = temperatureFieldsA[i] + TempStep
-       #if i == 0:
-       #    print "Current Temperature", temperatureFieldsA[i]       
 ##########################################################################################
 # Start of Middle Loop Iteration
 ##########################################################################################           
@@ -580,13 +736,23 @@ for nstep in range(0,numSteps):
                strainYFieldsA = strainYFields .asNumPyArray() 
                strainZFields = structureFields.strainZ[cellSitesLocal[n]]
                strainZFieldsA = strainZFields.asNumPyArray()
-        
+
+               eigenvalue1_positive=array([0.0])
+               eigenvalue2_positive=array([0.0])
+               eigenvalue3_positive=array([0.0])
+               eigenvalueFields = structureFields.eigenvalue[cellSitesLocal[n]]
+               eigenvalueFieldsA = eigenvalueFields.asNumPyArray()  
+               eigenvector1Fields = structureFields.eigenvector1[cellSitesLocal[n]]
+               eigenvector1FieldsA = eigenvector1Fields.asNumPyArray()  
+               eigenvector2Fields = structureFields.eigenvector2[cellSitesLocal[n]]
+               eigenvector2FieldsA = eigenvector2Fields.asNumPyArray()  
+               eigenvector3Fields = structureFields.eigenvector3[cellSitesLocal[n]]
+               eigenvector3FieldsA = eigenvector3Fields.asNumPyArray()  
+  
                sourceField = fractureFields.source[cellSitesLocal[n]]
                sourceFieldA = sourceField.asNumPyArray()
                sourceCoefField = fractureFields.sourcecoef[cellSitesLocal[n]]
                sourceCoefFieldA = sourceCoefField.asNumPyArray()
-               PhaseField = fractureFields.phasefieldvalue[cellSitesLocal[n]]
-               PhaseFieldA = PhaseField.asNumPyArray()
            
                deformation_change_max[0]=0
                deformation_change_maxi=0
@@ -601,7 +767,50 @@ for nstep in range(0,numSteps):
                        deformation_change_maxi=i                 
                    if abs(deformFieldsA[i,2]-deformation_z_outer[i])>deformation_change_max[0]:
                        deformation_change_max[0]=abs(deformFieldsA[i,2]-deformation_z_outer[i]) 
-                       deformation_change_maxi=i            
+                       deformation_change_maxi=i 
+                   
+                   #decomposeStrainTensor(strainXFieldsA[i],strainYFieldsA[i],strainZFieldsA[i],eigenvalueFieldsA[i],eigenvector1FieldsA[i],eigenvector2FieldsA[i],eigenvector3FieldsA[i],\
+                   #i,pfperfectFieldsA[i],rank_id)
+                   for j in range (0,3):
+                       eigenvector1FieldsA[i][j]=strainXFieldsA[i][j]
+                       eigenvector2FieldsA[i][j]=strainYFieldsA[i][j]
+                       eigenvector3FieldsA[i][j]=strainZFieldsA[i][j]
+                   
+                   if strain_trace[i] >= 0 and SymFlag==2:
+                       if V_flag[i] == 1 :
+                           #if strain_trace[i] < 1e-1 :
+                           #    print "================Tolerated Cell in Tension Found================",\
+                           #    rank_id,i,strain_trace[i],PhaseFieldA[i]
+                           #else :
+                           if strain_trace[i] > trace_change_threshold :
+                               repeat_array[i]=repeat_array[i]+1
+                               if repeat_array[i] < 20 :
+                                   print "================Mis Predict Cell in Tension Found================",\
+                                   rank_id,i,strain_trace[i],PhaseFieldA[i]," Count : ",repeat_array[i]," X: ",coordA[i][0]," Y: ",coordA[i][1]
+                                   compress_found_flag[0] = 1
+                                   eta1FieldsA[i]=Lamda_local[i]*(PhaseFieldA[i]**2.0+StiffnessResidual)        
+                                   V_flag[i]=0
+                               else :
+                                   print "================Ignored Cell in Tension Found================",\
+                                   rank_id,i,strain_trace[i],PhaseFieldA[i]," Count : ",repeat_array[i]
+                   elif SymFlag==2 :
+                       if V_flag[i]==0:
+                           #if strain_trace[i] > -1e-3 :
+                           #    print "================Tolerated Cell in Compression Found================",\
+                           #    rank_id,i,strain_trace[i],PhaseFieldA[i]
+                           #else :
+                           if strain_trace[i] < -trace_change_threshold :
+                               repeat_array[i]=repeat_array[i]+1
+                               if repeat_array[i] < 20 :
+                                   print "================Unexpected Cell in Compression Found================",\
+                                   rank_id,i,strain_trace[i],PhaseFieldA[i]," Count : ",repeat_array[i]," X: ",coordA[i][0]," Y: ",coordA[i][1]
+                                   compress_found_flag[0] = 1
+                                   eta1FieldsA[i]=Lamda_local[i]
+                                   #eta1FieldsA[i]=Lamda_local[i]+G_local[i]*2.0/3.0*(1-(PhaseFieldA[i]**2.0+StiffnessResidual))
+                                   V_flag[i]=1 
+                               else :
+                                   print "================Ignored Cell in Compression Found================",\
+                                   rank_id,i,strain_trace[i],PhaseFieldA[i]," Count : ",repeat_array[i]
                
                #print "rank: ",rank_id, "Max Deformation: ", deformation_change_max[0]/DeformUnit,deformation_change_max[0],\
                #"Current Deformation Component: ",deformFieldsA[deformation_change_maxi,0],deformFieldsA[deformation_change_maxi,1],deformFieldsA[deformation_change_maxi,2],\
@@ -674,7 +883,6 @@ for nstep in range(0,numSteps):
        Max_Dev_Strain_X = array([0.0])
        Max_Dev_Strain_Y = array([0.0])
         
-       
        for i in range(0,Count):
 
            if strain_trace[i] > 0:
@@ -692,31 +900,47 @@ for nstep in range(0,numSteps):
            strain_2_trace=(strainXFieldsA[i][0])**2+strainXFieldsA[i][1]**2+strainXFieldsA[i][2]**2+\
            strainYFieldsA[i][0]**2+(strainYFieldsA[i][1])**2+strainYFieldsA[i][2]**2+\
            strainZFieldsA[i][0]**2+strainZFieldsA[i][1]**2+(strainZFieldsA[i][2])**2
+               #if (K_local[i]/2.0*strain_trace_positive**2+G_local[i]*strain_dev2_trace) > EnergyHistoryField[i]:
+               #    ElasticEnergyField[i]=K_local[i]/2.0*strain_trace_positive**2+G_local[i]*strain_dev2_trace
+               #    #EnergyHistoryField[i]=ElasticEnergyField[i]
+               #else :
+               #    ElasticEnergyField[i]=EnergyHistoryField[i]
+           
+           if eigenvalueFieldsA[i][0]>0:
+               eigenvalue1_positive[0]=eigenvalueFieldsA[i][0]
+           else:
+               eigenvalue1_positive[0]=0
+           if eigenvalueFieldsA[i][1]>0:
+               eigenvalue2_positive[0]=eigenvalueFieldsA[i][1]
+           else:
+               eigenvalue2_positive[0]=0
+           if eigenvalueFieldsA[i][2]>0:
+               eigenvalue3_positive[0]=eigenvalueFieldsA[i][2]
+           else:
+               eigenvalue3_positive[0]=0
 
            if SymFlag==1:
                if strain_trace[i] >0:
-                   ElasticEnergyField[i] = K_local[i]/2.0*strain_trace_positive**2+G_local[i]*strain_dev2_trace
+                   ElasticEnergyField[i] = structcoef1FieldsA[i]*K_local[i]/2.0*strain_trace_positive**2+structcoef2FieldsA[i]*G_local[i]*strain_dev2_trace
                else: 
-                   ElasticEnergyField[i] = K_local[i]/2.0*strain_trace_negative**2+G_local[i]*strain_dev2_trace
+                   ElasticEnergyField[i] = structcoef1FieldsA[i]*K_local[i]/2.0*strain_trace_negative**2+structcoef2FieldsA[i]*G_local[i]*strain_dev2_trace
+               Total_Elastic_Energy[0] = Total_Elastic_Energy[0] + (PhaseFieldA[i]**2.0+StiffnessResidual)*(K_local[i]/2.0*strain_trace[i]**2+G_local[i]*strain_dev2_trace)*volumeA[i]
+           else:
+               if strain_trace[i] >0:
+                   ElasticEnergyField[i] = structcoef1FieldsA[i]*K_local[i]/2.0*strain_trace_positive**2+structcoef2FieldsA[i]*G_local[i]*strain_dev2_trace
+                   #ElasticEnergyField[i] = Lamda_local[i]/2.0*strain_trace_positive**2+G_local[i]*(eigenvalueFieldsA[i][0]**2.0+eigenvalueFieldsA[i][1]**2.0+eigenvalueFieldsA[i][2]**2.0)
+                   #ElasticEnergyField[i] = Lamda_local[i]/2.0*strain_trace_positive**2+G_local[i]*strain_2_trace
+               else: 
+                   ElasticEnergyField[i] = structcoef2FieldsA[i]*G_local[i]*strain_dev2_trace
+                   #ElasticEnergyField[i] = G_local[i]*(eigenvalueFieldsA[i][0]**2.0+eigenvalueFieldsA[i][1]**2.0+eigenvalueFieldsA[i][2]**2.0)
+                   #ElasticEnergyField[i] = G_local[i]*strain_2_trace
                if i==100:
-                   print i,ElasticEnergyField[i]
+                   print i,ElasticEnergyField[i],eigenvalueFieldsA[i]
                    print strainXFieldsA[i],strainYFieldsA[i],strainZFieldsA[i]
                    print tractZFieldsA[i][2]
-                  # print eigenvector1FieldsA[i],eigenvector2FieldsA[i],eigenvector3FieldsA[i]
-                   #print tractXFieldsA[i][0],tractYFieldsA[i][1],tractZFieldsA[i][2],pfvFieldsA[i],V_flag[i]
-               Total_Elastic_Energy[0] = Total_Elastic_Energy[0] + (PhaseFieldA[i]**2.0+StiffnessResidual)*(K_local[i]/2.0*strain_trace[i]**2+G_local[i]*strain_dev2_trace)*volumeA[i]
-           #else:
-           #    if strain_trace[i] >0:
-           #        ElasticEnergyField[i] = Lamda_local[i]/2.0*strain_trace_positive**2+G_local[i]*(eigenvalue1_positive[0]**2.0+eigenvalue2_positive[0]**2.0+eigenvalue3_positive[0]**2.0)
-           #    else: 
-           #        ElasticEnergyField[i] = G_local[i]*(eigenvalue1_positive[0]**2.0+eigenvalue2_positive[0]**2.0+eigenvalue3_positive[0]**2.0)
-           #    if i==100:
-           #        print i,ElasticEnergyField[i],eigenvalueFieldsA[i]
-           #        print strainXFieldsA[i],strainYFieldsA[i],strainZFieldsA[i]
-           #        print tractZFieldsA[i][2]
-           #        print eigenvector1FieldsA[i],eigenvector2FieldsA[i],eigenvector3FieldsA[i]
-           #        #print tractXFieldsA[i][0],tractYFieldsA[i][1],tractZFieldsA[i][2],pfvFieldsA[i],V_flag[i]
-           #    Total_Elastic_Energy[0] = Total_Elastic_Energy[0] + ((PhaseFieldA[i]**2.0+StiffnessResidual)*(K_local[i]/2.0*strain_trace_positive**2+G_local[i]*strain_dev2_trace)+K_local[i]/2.0*strain_trace_negative**2)*volumeA[i]
+                   print eigenvector1FieldsA[i],eigenvector2FieldsA[i],eigenvector3FieldsA[i]
+               #    #print tractXFieldsA[i][0],tractYFieldsA[i][1],tractZFieldsA[i][2],pfvFieldsA[i],V_flag[i]
+               Total_Elastic_Energy[0] = Total_Elastic_Energy[0] + ((PhaseFieldA[i]**2.0+StiffnessResidual)*(K_local[i]/2.0*strain_trace_positive**2+G_local[i]*strain_dev2_trace)+K_local[i]/2.0*strain_trace_negative**2)*volumeA[i]
            
            Total_Compression_Elastic_Energy[0] = Total_Compression_Elastic_Energy[0] + K_local[i]/2.0*strain_trace_negative**2
            
@@ -839,16 +1063,16 @@ for nstep in range(0,numSteps):
            for niter_PF in range(0,numPFIterations):
                for n in range(0,nmesh):
                    for i in range(0,Count):
-                       if PhaseFieldA[i]<PFPerfectField[i]:
-                           PhaseFieldA[i]=PFPerfectField[i]
+                       if PhaseFieldA[i]<pfperfectFieldsA[i]:
+                           PhaseFieldA[i]=pfperfectFieldsA[i]
                        if PhaseFieldA[i]>PFHistoryField[i]:
                            PhaseFieldA[i]=PFHistoryField[i]
                        sourceFieldA[i]=-(4.0*cLoC*ElasticEnergyField[i]/cFED+1.0)*PhaseFieldA[i]
                tmodel.advance(1)
                
            for i in range(0,Count):
-               if PhaseFieldA[i]<PFPerfectField[i]:
-                   PhaseFieldA[i]=PFPerfectField[i]
+               if PhaseFieldA[i]<pfperfectFieldsA[i]:
+                   PhaseFieldA[i]=pfperfectFieldsA[i]
                if PhaseFieldA[i]>PFHistoryField[i]:
                    PhaseFieldA[i]=PFHistoryField[i]
                PF_inner[i]=PhaseFieldA[i]
@@ -860,8 +1084,8 @@ for nstep in range(0,numSteps):
            
            fract_inner_flag[0] = 0
            for i in range(0,Count):
-               if PhaseFieldA[i]<PFPerfectField[i]:
-                   PhaseFieldA[i]=PFPerfectField[i]
+               if PhaseFieldA[i]<pfperfectFieldsA[i]:
+                   PhaseFieldA[i]=pfperfectFieldsA[i]
                if PhaseFieldA[i]>PFHistoryField[i]:
                    PhaseFieldA[i]=PFHistoryField[i]
                if abs(PF_inner[i]-PhaseFieldA[i])>PFTolerance:
@@ -897,7 +1121,7 @@ for nstep in range(0,numSteps):
        MPI.COMM_WORLD.Allreduce(MPI.IN_PLACE,[PF_change_max, MPI.DOUBLE], op=MPI.MAX)
        
        if rank_id==0:
-           print "Phase Field Minimum Value: ",PF_min[0], "Maximum Phase Field Change: ",PF_change_max[0],PhaseFieldA[PF_change_maxi],PhaseFieldA[i]
+           print "Phase Field Minimum Value: ",PF_min[0], "Maximum Phase Field Change: ",PF_change_max[0],PhaseFieldA[PF_change_maxi]
        if mid_iter>MidIterUpLimit:
            mid_loop_flag[0] = 0
     
@@ -906,7 +1130,6 @@ for nstep in range(0,numSteps):
            #etaFieldsA[i]=G_local[i]*(PhaseFieldA[i]**2.0+StiffnessResidual)
            #eta1FieldsA[i]=Lamda_local[i]*PhaseFieldA[i]**2.0
            if SymFlag==1:
-               #etaFieldsA[i]=G_local[i]
                etaFieldsA[i]=G_local[i]*(PhaseFieldA[i]**2.0+StiffnessResidual)
                eta1FieldsA[i]=Lamda_local[i]*(PhaseFieldA[i]**2.0+StiffnessResidual)
            #elif V_flag[i]==0:
@@ -920,7 +1143,7 @@ for nstep in range(0,numSteps):
                #etaFieldsA[i]=G_local[i]*(PhaseFieldA[i]**2.0+StiffnessResidual)
                #eta1FieldsA[i]=Lamda_local[i]*(PhaseFieldA[i]**2.0+StiffnessResidual)
                #eta1FieldsA[i]=Lamda_local[i]+G_local[i]*2.0/3.0*(1-(PhaseFieldA[i]**2.0+StiffnessResidual))
-           #pfvFieldsA[i]=PhaseFieldA[i]
+           pfvFieldsA[i]=PhaseFieldA[i]
 ##########################################################################################  
        #output time change and intermediate status
        title_name="Inter "+str(nstep)+" "+str(mid_iter)
