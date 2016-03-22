@@ -1,6 +1,0 @@
-Options
-=================
-
-.. automodule:: options
-    :members:
-
