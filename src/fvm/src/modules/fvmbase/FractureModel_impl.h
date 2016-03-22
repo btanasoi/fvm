@@ -23,6 +23,7 @@
 #include "AMG.h"
 #include "Linearizer.h"
 #include "GradientModel.h"
+#include "Underrelaxer.h"
 //#include "GenericIBDiscretization.h"
 #include "SourceDiscretizationforFracture.h"
 #include "TimeDerivativeDiscretization.h"
@@ -358,6 +359,18 @@ public:
             gbc.applyInterfaceBC();
         }
     }
+#if 0
+    shared_ptr<Discretization>
+      ud(new Underrelaxer<T,T,T>
+         (_meshes,_fractureFields.phasefieldvalue,
+          _options["phasefieldvalueURF"]));
+    
+    DiscrList discretizations2;
+    discretizations2.push_back(ud);
+
+    linearizer.linearize(discretizations2,_meshes,ls.getMatrix(),
+                         ls.getX(), ls.getB());
+#endif
   }
   
  /* T getHeatFluxIntegral(const Mesh& mesh, const int faceGroupId)
@@ -403,8 +416,14 @@ public:
         
         MFRPtr normRatio((*rNorm)/(*_initialNorm));
 
+#ifdef FVM_PARALLEL	
+        if ( MPI::COMM_WORLD.Get_rank() == 0 ){  //only root process
         cout << _niters << ": " << *rNorm << endl;
-
+        }	     
+#endif
+#ifndef FVM_PARALLEL	
+        cout << _niters << ": " << *rNorm << endl;
+#endif
         
         _options.getLinearSolver().cleanup();
 

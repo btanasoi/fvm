@@ -17,7 +17,9 @@ struct StructureFields
   Field deformationGradient;
   Field deformationFlux;
   Field eta;
+  Field etaold;
   Field eta1;
+  Field eta1old;
   Field alpha;
   Field density;
   Field deformationN1;
@@ -37,6 +39,14 @@ struct StructureFields
   Field bodyForce;
   Field volume0;
   Field creepConstant; 
+  Field pfv;
+  Field eigenvalue;
+  Field eigenvector1;
+  Field eigenvector2;
+  Field eigenvector3;
+  Field pfperfect;
+  Field structcoef1;
+  Field structcoef2;
 };
 
 #endif

@@ -10,7 +10,9 @@ StructureFields::StructureFields(const string baseName) :
   deformationGradient(baseName + ".deformationGradient"),
   deformationFlux(baseName + ".deformationFlux"),
   eta(baseName + ".eta"),
+  etaold(baseName + ".etaold"),
   eta1(baseName + ".eta1"),
+  eta1old(baseName + ".eta1old"),
   alpha(baseName + ".alpha"),
   density(baseName + ".density"),
   deformationN1(baseName + ".deformationN1"),
@@ -29,6 +31,14 @@ StructureFields::StructureFields(const string baseName) :
   temperature(baseName + ".temperature"),
   bodyForce(baseName + ".bodyForce"),
   volume0(baseName + ".volume0"),
-  creepConstant(baseName + ".creepConstant")
+  creepConstant(baseName + ".creepConstant"),
+  pfv(baseName + ".pfv"),
+  eigenvalue(baseName + ".eigenvalue"),
+  eigenvector1(baseName + ".eigenvector1"),
+  eigenvector2(baseName + ".eigenvector2"),
+  eigenvector3(baseName + ".eigenvector3"),
+  pfperfect(baseName + ".pfperfect"),
+  structcoef1(baseName + ".structcoef1"),
+  structcoef2(baseName + ".structcoef2")
 {}
 
