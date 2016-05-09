@@ -1,0 +1,8 @@
+#!/bin/sh -l
+# FILENAME:  run_py.sub
+
+cd $PBS_O_WORKDIR
+source /home/xie45/MEMOSA-fvm/fvm/env-hansen.sh
+
+pwd
+mpirun -np 16 python ./PMMA_Glass_Static.py four-particles-scaled-10.cas --type quad > PMMA_Glass_Static.out

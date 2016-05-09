@@ -33,10 +33,10 @@ beamBot = 5
 beamLeft = 4
 beamRight = 3
 IDs = (3, 4, 5, 6)
-BoundaryPositionTop = 0.00266664-0.00266664/1e3 #Top
-BoundaryPositionRight = 0.003883295-0.003883295/1e3 #Right
-BoundaryPositionLeft = 0.003883295/1e3
-BoundaryPositionBottom = 0.00266664/1e3
+BoundaryPositionTop = 0.000266664-0.000266664/1e3 #Top
+BoundaryPositionRight = 0.0003883295-0.0003883295/1e3 #Right
+BoundaryPositionLeft = 0.0003883295/1e3
+BoundaryPositionBottom = 0.000266664/1e3
 CrackTipX = 0.5e-3
 CrackTipY = 1e-3
 
@@ -45,15 +45,17 @@ CrackTipY = 1e-3
 # parameters to be studied
 numSteps = 400			         # Number of Steps
 E = 0.15e9                       # Matrix: Young's Modulus
-E_fiber=15.3e9                   # HMX: Young's Modulus
+E_fiber=14.2e9                   # HMX: Young's Modulus
 nu = 0.45                        # Matrix: Poisson's ratio
-nu_fiber=0.32                    # HMX: Poisson's ratio
+nu_fiber=0.31                    # HMX: Poisson's ratio
 density = 910                    # Sylgard: http://www.sandia.gov/polymer-properties/E3-density_vs_temp.html
 density_fiber = 1910             # HMX: https://en.wikipedia.org/wiki/HMX
-cFED = 200                       # Matrix: critical fracture energy density, J/m^2
-cFED_fiber = 0.2                 # HMX: critical fracture energy density, J/m^2
-cLoC=  0.006e-3                  # Matrix: model parameter controlling the width of the smooth approximation of the crack, m
-cLoC_fiber=  0.006e-3            # HMX: model parameter controlling the width of the smooth approximation of the crack, m
+cFED = 116                       # Matrix: critical fracture energy density, J/m^2
+cFED_fiber = 90                  # HMX: critical fracture energy density, J/m^2
+cFED_interface = 11
+cLoC=  0.01e-3                  # Matrix: model parameter controlling the width of the smooth approximation of the crack, m
+cLoC_fiber=  0.0005e-3            # HMX: model parameter controlling the width of the smooth approximation of the crack, m
+cLoC_interface=  0.001e-3
 ########################################################################################## 
 # Set Parameters
 timeStep = 3600                # Size of timestep (seconds)
@@ -87,7 +89,7 @@ else :
 
 DeformUnit = (cFED*BoundaryPositionTop/Lamda)**0.5  #Normalized Displacement Unit
 #DispStep = 0.01*DeformUnit	   # Displacement Step
-DispStep = 1.0e-6
+DispStep = 1.0e-7
 StressStep = 48e4
 KI = 1.0e5
 LoadCoef = 0.0000000001
@@ -538,16 +540,18 @@ for n in range(0,nmesh):
                     particle_interface_distance_min = particle_interface_distance
 
             #print  particle_interface_distance_min
-            if particle_interface_distance_min<0.08e-3:
+            if particle_interface_distance_min<0.008e-3:
                 E_local[i]=E_fiber
                 nu_local[i]=nu_fiber
                 fractureToughnessField[i]=cFED_fiber
                 cLoCField[i]=cLoC_fiber
-            elif particle_interface_distance_min<0.18e-3:
-                E_local[i]=(E-E_fiber)*(particle_interface_distance_min-0.08e-3)/0.1e-3+E_fiber
-                nu_local[i]=(nu-nu_fiber)*(particle_interface_distance_min-0.08e-3)/0.1e-3+nu_fiber
-                fractureToughnessField[i]=(cFED-cFED_fiber)*(particle_interface_distance_min-0.08e-3)/0.1e-3+cFED_fiber
-                cLoCField[i]=(cLoC-cLoC_fiber)*(particle_interface_distance_min-0.08e-3)/0.1e-3+cLoC_fiber
+            elif particle_interface_distance_min<0.018e-3:
+                E_local[i]=(E-E_fiber)*(particle_interface_distance_min-0.008e-3)/0.01e-3+E_fiber
+                nu_local[i]=(nu-nu_fiber)*(particle_interface_distance_min-0.008e-3)/0.01e-3+nu_fiber
+                #fractureToughnessField[i]=(cFED-cFED_fiber)*(particle_interface_distance_min-0.08e-3)/0.1e-3+cFED_fiber
+                #cLoCField[i]=(cLoC-cLoC_fiber)*(particle_interface_distance_min-0.08e-3)/0.1e-3+cLoC_fiber
+                fractureToughnessField[i]=cFED_interface
+                cLoCField[i]=cLoC_interface
 
             G_local[i] = E_local[i]/(2.*(1+nu_local[i]))
             K_local[i]=E_local[i]/3.0/(1-2.0*nu_local[i])
