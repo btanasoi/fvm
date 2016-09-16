@@ -23,6 +23,7 @@
 #include "AMG.h"
 #include "Linearizer.h"
 #include "GradientModel.h"
+#include "Underrelaxer.h"
 //#include "GenericIBDiscretization.h"
 #include "SourceDiscretizationforFracture.h"
 #include "TimeDerivativeDiscretization.h"
@@ -132,22 +133,11 @@ public:
 	*oneCell = T(1.0);
 	_fractureFields.one.addArray(cells,oneCell);
 
-	//create specific heat field   rho*Cp
-	//shared_ptr<TArray> cp(new TArray(cells.getCount()));
-	//*cp = vc["density"] * vc["specificHeat"];
-	//_thermalFields.specificHeat.addArray(cells, cp);
-
 	//initial phasefieldvalue gradient array
 	shared_ptr<TGradArray> gradT(new TGradArray(cells.getCountLevel1()));
 	gradT->zero();
 	_fractureFields.phasefieldGradient.addArray(cells,gradT);
         
-	//inital convection flux at faces
-	
-	//const StorageSite& allFaces = mesh.getFaces();
-	//shared_ptr<TArray> convFlux(new TArray(allFaces.getCount()));
-	//convFlux->zero();
-	//_thermalFields.convectionFlux.addArray(allFaces,convFlux);
 
 	//phasefield flux at faces
         foreach(const FaceGroupPtr fgPtr, mesh.getBoundaryFaceGroups())
@@ -256,15 +246,6 @@ public:
 	  _fractureFields.phasefieldGradient));
     discretizations.push_back(dd);
  
-    //shared_ptr<Discretization>
-    //  cd(new ConvectionDiscretization<T,T,T>
-	//(_meshes,_geomFields,
-	//  _fractureFields.phasefieldvalue,
-	//  _fractureFields.phasefieldFlux,
-	//  _fractureFields.zero,
-	//  _fractureFields.phasefieldGradient,
-    //      _options.useCentralDifference));
-    //discretizations.push_back(cd);
     
     shared_ptr<Discretization>
       scfd(new SourceDiscretizationforFracture<T, T, T>
@@ -287,11 +268,6 @@ public:
 	      _options["timeStep"]));
 	discretizations.push_back(td);
       }
-    
-    //shared_ptr<Discretization>
-    //  ibm(new GenericIBDiscretization<T,T,T>
-	//  (_meshes,_geomFields,_thermalFields.temperature));
-    //discretizations.push_back(ibm);
     
 
     Linearizer linearizer;
@@ -358,30 +334,20 @@ public:
             gbc.applyInterfaceBC();
         }
     }
+#if 0
+    shared_ptr<Discretization>
+      ud(new Underrelaxer<T,T,T>
+         (_meshes,_fractureFields.phasefieldvalue,
+          _options["phasefieldvalueURF"]));
+    
+    DiscrList discretizations2;
+    discretizations2.push_back(ud);
+
+    linearizer.linearize(discretizations2,_meshes,ls.getMatrix(),
+                         ls.getX(), ls.getB());
+#endif
   }
   
- /* T getHeatFluxIntegral(const Mesh& mesh, const int faceGroupId)
-  {
-    T r(0.);
-    bool found = false;
-    foreach(const FaceGroupPtr fgPtr, mesh.getBoundaryFaceGroups())
-    {
-        const FaceGroup& fg = *fgPtr;
-        if (fg.id == faceGroupId)
-        {
-            const StorageSite& faces = fg.site;
-            const int nFaces = faces.getCount();
-            const TArray& heatFlux =
-              dynamic_cast<const TArray&>(_thermalFields.heatFlux[faces]);
-            for(int f=0; f<nFaces; f++)
-              r += heatFlux[f];
-            found=true;
-        }
-    }
-    if (!found)
-      throw CException("getHeatFluxIntegral: invalid faceGroupID");
-    return r;
-  }	*/
 	
 
   void advance(const int niter)
@@ -403,8 +369,14 @@ public:
         
         MFRPtr normRatio((*rNorm)/(*_initialNorm));
 
+#ifdef FVM_PARALLEL	
+        if ( MPI::COMM_WORLD.Get_rank() == 0 ){  //only root process
         cout << _niters << ": " << *rNorm << endl;
-
+        }	     
+#endif
+#ifndef FVM_PARALLEL	
+        cout << _niters << ": " << *rNorm << endl;
+#endif
         
         _options.getLinearSolver().cleanup();
 
@@ -456,125 +428,6 @@ public:
     }
   }
 
-/*
-#if !(defined(USING_ATYPE_TANGENT) || defined(USING_ATYPE_PC))
-  
-  void dumpMatrix(const string fileBase)
-  {
-    LinearSystem ls;
-    initLinearization(ls);
-    
-    ls.initAssembly();
-    
-    linearize(ls);
-    
-    ls.initSolve();
-
-    MultiFieldMatrix& matrix = ls.getMatrix();
-    MultiField& b = ls.getB();
-for ( unsigned int id = 0; id < _meshes.size(); id++ ){
-    const Mesh& mesh = *_meshes[id];
-    const StorageSite& cells = mesh.getCells();
-    
-    MultiField::ArrayIndex tIndex(&_thermalFields.temperature,&cells);
-
-    T_Matrix& tMatrix =
-      dynamic_cast<T_Matrix&>(matrix.getMatrix(tIndex,tIndex));
-
-    TArray& tDiag = tMatrix.getDiag();
-    TArray& tCoeff = tMatrix.getOffDiag();
-
-    TArray& rCell = dynamic_cast<TArray&>(b[tIndex]);
-
-    const CRConnectivity& cr = tMatrix.getConnectivity();
-
-    const Array<int>& row = cr.getRow();
-    const Array<int>& col = cr.getCol();
-    
-    const int nCells = cells.getSelfCount();
-    int nCoeffs = nCells;
-
-    for(int i=0; i<nCells; i++)
-      for(int jp=row[i]; jp<row[i+1]; jp++)
-      {
-          const int j = col[jp];
-          if (j<nCells) nCoeffs++;
-      }
-    stringstream ss;
-    ss << id;
-    string matFileName = fileBase + "_mesh" + ss.str() +  ".mat";
-
-
-    FILE *matFile = fopen(matFileName.c_str(),"wb");
-    
-    fprintf(matFile,"%%%%MatrixMarket matrix coordinate real general\n");
-    fprintf(matFile,"%d %d %d\n", nCells,nCells,nCoeffs);
-
-    for(int i=0; i<nCells; i++)
-    {
-        fprintf(matFile,"%d %d %lf\n", i+1, i+1, tDiag[i]);
-        for(int jp=row[i]; jp<row[i+1]; jp++)
-        {
-            const int j = col[jp];
-            if (j<nCells)
-              fprintf(matFile,"%d %d %lf\n", i+1, j+1, tCoeff[jp]);
-        }
-    }
-
-    fclose(matFile);
-
-    string rhsFileName = fileBase + ".rhs";
-    FILE *rhsFile = fopen(rhsFileName.c_str(),"wb");
-    
-    for(int i=0; i<nCells; i++)
-      fprintf(rhsFile,"%lf\n",-rCell[i]);
-
-    fclose(rhsFile);
-
-  }
-}
-#endif
-  
-  void computeIBFaceTemperature(const StorageSite& particles)
-  {
-    typedef CRMatrixTranspose<T,T,T> IMatrix;
-
-    const TArray& pT =
-      dynamic_cast<const TArray&>(_thermalFields.temperature[particles]);
-
-    const int numMeshes = _meshes.size();
-    for (int n=0; n<numMeshes; n++)
-    {
-        const Mesh& mesh = *_meshes[n];
-        if (!mesh.isShell() && mesh.getIBFaces().getCount() > 0){
-           const StorageSite& cells = mesh.getCells();
-           const StorageSite& ibFaces = mesh.getIBFaces();
-        
-           GeomFields::SSPair key1(&ibFaces,&cells);
-           const IMatrix& mIC =
-           dynamic_cast<const IMatrix&>
-           (*_geomFields._interpolationMatrices[key1]);
-
-           GeomFields::SSPair key2(&ibFaces,&particles);
-           const IMatrix& mIP =
-           dynamic_cast<const IMatrix&>
-           (*_geomFields._interpolationMatrices[key2]);
-
-           shared_ptr<TArray> ibT(new TArray(ibFaces.getCount()));
-        
-           const TArray& cT =
-             dynamic_cast<const TArray&>(_thermalFields.temperature[cells]);
-    
-
-           ibT->zero();
-
-	   mIC.multiplyAndAdd(*ibT,cT);
-	   mIP.multiplyAndAdd(*ibT,pT);
-	  _thermalFields.temperature.addArray(ibFaces,ibT);
-        }  
-    }
-
-  }	*/
 
 private:
   const MeshList _meshes;
@@ -644,31 +497,6 @@ FractureModel<T>::advance(const int niter)
 {
   _impl->advance(niter);
 }
-
-/*
-template<class T>
-void
-FractureModel<T>::computeIBFaceTemperature(const StorageSite& particles)
-{
-  _impl->computeIBFaceTemperature(particles);
-}
-
-#if !(defined(USING_ATYPE_TANGENT) || defined(USING_ATYPE_PC))
-
-template<class T>
-void
-ThermalModel<T>::dumpMatrix(const string fileBase)
-{
-  _impl->dumpMatrix(fileBase);
-}
-#endif
-
-template<class T>
-T
-ThermalModel<T>::getHeatFluxIntegral(const Mesh& mesh, const int faceGroupId)
-{
-  return _impl->getHeatFluxIntegral(mesh, faceGroupId);
-}	*/
 
 template<class T>
 void

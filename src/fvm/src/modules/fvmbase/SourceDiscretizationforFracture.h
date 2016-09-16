@@ -71,8 +71,6 @@ public:
         rCell[c] += cellVolume[c]*(1.0+source[c]);
 		diag[c] += cellVolume[c]*sourcecoef[c];
 
-	  //if (c >= 400){
-	  //cout << c << ": " << cellVolume[c] << " " << diag[c] << "\n" << endl;}
     }
   }
     

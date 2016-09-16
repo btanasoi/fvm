@@ -16,13 +16,12 @@ struct FractureFields
   Field phasefieldvalue;
   Field phasefieldvalueN1;
   Field phasefieldvalueN2;
-  //Field specificHeat;
   Field phasefieldFlux;
   Field phasefieldGradient;
   Field conductivity;
   Field source;
   Field sourcecoef;
-  //Field convectionFlux;
+  Field phasefieldchange;
 
   Field zero;                     //used to fill in continuityResidual
   Field one;                      //used to fill in density

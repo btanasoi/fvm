@@ -38,6 +38,7 @@ struct FractureModelOptions : public FloatVarDict<T>
   {
     this->defineVar("initialPhaseFieldValue",T(1.0));
     this->defineVar("timeStep", T(1e-7));
+    this->defineVar("phasefieldvalueURF", T(0.5));
     this->relativeTolerance=1e-8;
     this->absoluteTolerance=1e-16;
     this->linearSolver = 0;

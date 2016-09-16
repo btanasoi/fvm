@@ -15,6 +15,9 @@ struct StructureBC : public FloatVarDict<T>
       this->defineVar("specifiedXDeformation",T(0.0));
       this->defineVar("specifiedYDeformation",T(0.0));
       this->defineVar("specifiedZDeformation",T(0.0));
+      this->defineVar("specifiedlSurfingLoadNormFactor",T(1.0));
+      this->defineVar("specifiedlSurfingLoadNum",T(1.0));
+      this->defineVar("specifiedlSurfingLoadSpeed",T(1.0));
       this->defineVar("specifiedXXTraction",T(0.0));
       this->defineVar("specifiedXYTraction",T(0.0));
       this->defineVar("specifiedXZTraction",T(0.0));
@@ -40,9 +43,18 @@ struct StructureVC : public FloatVarDict<T>
   StructureVC()
   {
       this->defineVar("eta",T(1.0));
+      this->defineVar("etaold",T(1.0));
       this->defineVar("eta1",T(1.0));
+      this->defineVar("eta1old",T(1.0));
       this->defineVar("density",T(1.0));
       this->defineVar("alpha",T(1.0));
+      this->defineVar("pfv",T(1.0));
+      this->defineVar("pfperfect",T(0.0));
+      this->defineVar("structcoef1",T(1.0));
+      this->defineVar("structcoef2",T(1.0));
+	  this->defineVar("cvolpos",T(1.0));
+	  this->defineVar("cvolneg",T(1.0));
+	  this->defineVar("cdev",T(1.0));
   }
   string vcType;
 };
@@ -56,12 +68,24 @@ struct StructureModelOptions : public FloatVarDict<T>
     this->defineVar("initialXDeformation",T(0.0));
     this->defineVar("initialYDeformation",T(0.0));
     this->defineVar("initialZDeformation",T(0.0));
-    this->defineVar("deformationURF",T(0.7));
+    this->defineVar("deformationURF",T(1.0));
     this->defineVar("timeStep",T(0.1));
     this->defineVar("operatingTemperature",T(300.0));
     this->defineVar("residualXXStress",T(0.));
     this->defineVar("residualYYStress",T(0.));
     this->defineVar("residualZZStress",T(0.));
+    this->defineVar("initialEigenvalue1",T(0.0));
+    this->defineVar("initialEigenvalue2",T(0.0));
+    this->defineVar("initialEigenvalue3",T(0.0));
+    this->defineVar("initialEigenvector1X",T(0.0));
+    this->defineVar("initialEigenvector1Y",T(0.0));
+    this->defineVar("initialEigenvector1Z",T(0.0));
+    this->defineVar("initialEigenvector2X",T(0.0));
+    this->defineVar("initialEigenvector2Y",T(0.0));
+    this->defineVar("initialEigenvector2Z",T(0.0));
+    this->defineVar("initialEigenvector3X",T(0.0));
+    this->defineVar("initialEigenvector3Y",T(0.0));
+    this->defineVar("initialEigenvector3Z",T(0.0));
 
     this->deformationTolerance=1e-4;
     this->printNormalizedResiduals = true;
